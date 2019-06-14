@@ -219,7 +219,6 @@ void convert_ad_to_xy(void)
 //Y=(320 * AD - 2100* 320) / 1900
     touch_dot.x=(240*touch_dot.x_ad_val -100*240)/ 1900;
     touch_dot.y=(320*touch_dot.y_ad_val -100*320)/ 1900;
-
 }
  
 /*************************************************/

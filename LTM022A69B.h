@@ -61,35 +61,35 @@ typedef enum
 
 /* PB5( RS )   PD6( CS )  PB6 ( RST )  PB4(TOUCH_CS)  */
 
-// #define TOUCH_nCS_H() GPIO_SetBit(GPIOB,6);
-// #define TOUCH_nCS_L() GPIO_ClearBit(GPIOB,6);
+ #define TOUCH_nCS_H() GPIO_SetBit(GPIOB,6);
+ #define TOUCH_nCS_L() GPIO_ClearBit(GPIOB,6);
 
-// #define LCD_RST_H() GPIO_SetBit(GPIOB,10);
-// #define LCD_RST_L() GPIO_ClearBit(GPIOB,10);
+ #define LCD_RST_H() GPIO_SetBit(GPIOB,10);
+ #define LCD_RST_L() GPIO_ClearBit(GPIOB,10);
 
-// #define LCD_RS_H() GPIO_SetBit(GPIOB,8);
-// #define LCD_RS_L() GPIO_ClearBit(GPIOB,8);
+ #define LCD_RS_H() GPIO_SetBit(GPIOB,8);
+ #define LCD_RS_L() GPIO_ClearBit(GPIOB,8);
 
-// #define LCD_CS_H() GPIO_SetBit(GPIOB,7);
-// #define LCD_CS_L() GPIO_ClearBit(GPIOB,7);
+ #define LCD_CS_H() GPIO_SetBit(GPIOB,7);
+ #define LCD_CS_L() GPIO_ClearBit(GPIOB,7);
 
-// #define LCD_PWM_H() GPIO_SetBit(GPIOB,5);
-// #define LCD_PWM_L() GPIO_ClearBit(GPIOB,5);
+ #define LCD_PWM_H() GPIO_SetBit(GPIOB,5);
+ #define LCD_PWM_L() GPIO_ClearBit(GPIOB,5);
 
-#define TOUCH_nCS_H() GPIOB->BSRR = 0x1 << 6;
-#define TOUCH_nCS_L() GPIOB->BSRR = 0x1 << 18;
+//#define TOUCH_nCS_H() GPIOB->BSRR = 0x1 << 6;
+//#define TOUCH_nCS_L() GPIOB->BSRR = 0x1 << 18;
 
-#define LCD_RST_H() GPIOB->BSRR = 0x1 << 10;
-#define LCD_RST_L() GPIOB->BSRR = 0x1 << 26;
+//#define LCD_RST_H() GPIOB->BSRR = 0x1 << 10;
+//#define LCD_RST_L() GPIOB->BSRR = 0x1 << 26;
 
-#define LCD_RS_H() GPIOB->BSRR = 0x1 << 8;
-#define LCD_RS_L() GPIOB->BSRR = 0x1 << 24;
+//#define LCD_RS_H() GPIOB->BSRR = 0x1 << 8;
+//#define LCD_RS_L() GPIOB->BSRR = 0x1 << 24;
 
-#define LCD_CS_H() GPIOB->BSRR = 0x1 << 7;
-#define LCD_CS_L() GPIOB->BSRR = 0x1 << 23;
+//#define LCD_CS_H() GPIOB->BSRR = 0x1 << 7;
+//#define LCD_CS_L() GPIOB->BSRR = 0x1 << 23;
 
-#define LCD_PWM_H() GPIOB->BSRR = 0x1 << 5;
-#define LCD_PWM_L() GPIOB->BSRR = 0x1 << 21;
+//#define LCD_PWM_H() GPIOB->BSRR = 0x1 << 5;
+//#define LCD_PWM_L() GPIOB->BSRR = 0x1 << 21;
 
 void GPIO_SetBit(GPIO_TypeDef * pGPIO,int pinnum);
 // pGPIO->BSRR = 0x1 << pinnum;

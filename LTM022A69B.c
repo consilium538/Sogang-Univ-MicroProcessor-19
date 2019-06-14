@@ -24,12 +24,14 @@
 
 void GPIO_SetBit(GPIO_TypeDef * pGPIO,int pinnum)
 {
-	pGPIO->BSRR = 0x1 << pinnum;
+//	pGPIO->BSRR = 0x1 << pinnum;
+    pGPIO->ODR |= 1 << pinnum;
 }
 
 void GPIO_ClearBit(GPIO_TypeDef * pGPIO,int pinnum)
 {
-	pGPIO->BSRR = 0x1 << (pinnum + 16);
+//	pGPIO->BSRR = 0x1 << (pinnum + 16);
+    pGPIO->ODR &= ~(1 << pinnum);
 }
 
 void lcd_ctrl_port_init(void);      //nRS,nCS ... initialization
@@ -48,9 +50,10 @@ void lcd_ctrl_port_init(void);      //nRS,nCS ... initialization
 void SPI0_Init(void)
 {
 	RCC->APB2ENR|=1<<12;		//spi clock enable
-	SPI1->CR1=(1)<<3;//baudrate setting					pclk /2   
+	SPI1->CR1=(1)<<3;//baudrate setting					pclk / 4
+	// SPI1->CR1=(0)<<3;//baudrate setting					pclk /2   
 	SPI1->CR1|=((1)<<1) | ((1)<<0);//cpol=1 cpha=1		
-	SPI1->CR1|=3<<8;	
+	SPI1->CR1|=3<<8;
 	SPI1->CR1|=(0)<<11; //8bit data frame
 	//dff setting 16bit data frame format
 	//msbfirst
@@ -58,13 +61,9 @@ void SPI0_Init(void)
 	SPI1->CR1|=1<<6; //spe on
 }
 
-//****************************************** 
-//?áê?Ëß 
-//****************************************** 
-
 unsigned char SPI0_communication(unsigned char send_char)
 {
-	SPI1->DR = send_char;               //???Ëß??
+	SPI1->DR = send_char;
 	while( !( SPI1->SR & SPI_SR_RXNE ) );
 	return SPI1->DR;
 }
@@ -149,6 +148,9 @@ void LCD_WRITE_COMMAND(unsigned int index,unsigned int data)
 *******************************************************************************/
 void LCD_WRITE_DATA(unsigned int data)
 {
+	TOUCH_nCS_H();
+	LCD_RS_H();
+	LCD_CS_L();
     SPI0_communication((unsigned char)(data>>8));    //00000000 000000000
     SPI0_communication((unsigned char)(data));
 }
@@ -328,7 +330,7 @@ void lcd_clear_area(unsigned int color_front,
 	LCD_WRITE_COMMAND( 0x212, y ); 	//y start point
 	LCD_WRITE_COMMAND( 0x211, x + width - 1 );	//x end point
 	LCD_WRITE_COMMAND( 0x213, y + height - 1 );	//y end point
-		
+
 	LCD_WRITE_COMMAND( 0x200, x );
 	LCD_WRITE_COMMAND( 0x201, y );
 
@@ -415,16 +417,6 @@ void lcd_display_char(  unsigned char ch_asc,
 	LCD_CS_H();
 }
 
-/******************************************************************************
-* Function Name  : lcd_display_string
-* Description    : *str: address of string data. 
-					x: the xth row(0~30).
-					y: the yth column(0~20).
-					color_front, color_background.
-* Input          : None
-* Output         : None
-* Return         : None
-******************************************************************************/
 void lcd_display_string(const unsigned char *str, 
 						unsigned int color_front, 
 						unsigned int color_background, 
@@ -446,20 +438,6 @@ void lcd_display_string(const unsigned char *str,
     }
 }
 
-/******************************************************************************
-* Function Name  : ?í®?ãÆ
-* Description    : 16x16ïÃ?îÜ?í®?ãÆùÞ?
-* Input          : gb:?í®??í®Ù¼ñéîÜêÈöÇ£¬x:?ãÆêÈöÇð¯?Öª£¬y:?ãÆêÈöÇð¯?ú¼
-					color_front, color_background.  
-* Output         : None
-* Return         : None
-******************************************************************************/
-/*?ãÆÛ°Ûö£¨Ò´êÅìí£©
-for( i = 2; i < 8; i++ )
-{
-	lcd_display_GB2312( i-2, (i-1)*2, 0 );
-}
-*/
 void lcd_display_GB2312( unsigned char gb, 
 						unsigned int color_front, 
 						unsigned int color_background, 
@@ -724,28 +702,28 @@ unsigned char lcd_draw_line(
 	unsigned int d , iTag;
 	unsigned int x , y;
 	lcd_draw_dot( line_color , x1 , y1 );
-	if( x1 == x2 && y1 == y2 )	/*åýÍý?ïÃñìùê£¬?áÖý¨ØüîÜ?íÂ*/
+	if( x1 == x2 && y1 == y2 )
 	{
 		return 1;
 	}
 	iTag = 0;
 	dx = ( x2 - x1 );
 	dy = ( y2 - y1 );
-	if( dx < dy )	/*åýÍýdy???Û°ú¾£¬?Îß???ñ¦?*/
+	if( dx < dy )
 	{
 		iTag = 1 ;
 		Swap ( &x1, &y1 );
 		Swap ( &x2, &y2 );
 		Swap ( &dx, &dy );
 	}
-	tx = ( x2 - x1 ) > 0 ? 1 : -1;	   /*?ïÒãÀñò1?ãÀ?1*/
+	tx = ( x2 - x1 ) > 0 ? 1 : -1;
 	ty = ( y2 - y1 ) > 0 ? 1 : -1;
 	x = x1;
 	y = y1;
 	inc1 = 2 * dy;
 	inc2 = 2 * ( dy - dx );
 	d = inc1 - dx ;
-	while( x != x2 )	 /*âà??ïÃ*/
+	while( x != x2 )
 	{
 		if( d < 0 )
 		{
@@ -769,28 +747,20 @@ unsigned char lcd_draw_line(
 	return 0;
 }
 
-/**********************************************/
-/* ùÞ?ÍíÒö£»Ï´mîÜnó­Û°                       */
-/**********************************************/
 unsigned long mypow(unsigned char m,unsigned char n)
 {
 	unsigned long result=1;	 
 	while(n--)result*=m;    
 	return result;
 }
-/**********************************************/
-/* ùÞ?ÍíÒö£º?ãÆ?í®                         */
-/* ìýÏ¢??£ºx,y :ÑÃïÃñ¦?	 	              */
-/*           num_len :?í®îÜêÈ?				  */
-/*           num:??(0~4294967295);	   	  */
-/**********************************************/
+
 void lcd_display_number(unsigned int x,
                         unsigned int y,
                         unsigned long num,
                         unsigned char num_len )
 {         	
 	unsigned char t,temp;
-	unsigned char enshow=0;		 // ó®?ÕáéÄ?ËÛÓüõÌÍÔêÈîÜ0	
+	unsigned char enshow=0;	
 				   
 	for(t=0;t<num_len;t++)
 	{
