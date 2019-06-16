@@ -70,7 +70,7 @@ unsigned char SPI0_communication(unsigned char send_char)
 
 void LCD_WRITE_REG(unsigned int index)
 {
-		uint value_index;
+    uint value_index;
 	TOUCH_nCS_H();
 
 	LCD_RS_L();
@@ -196,7 +196,7 @@ void lcd_init(void)
 
 	LCD_WRITE_COMMAND( 0x000, 0x0001 ); /* oschilliation start */
 	delay_us( 10 );
-	/* Power settings */  	
+	/* Power settings */
 	LCD_WRITE_COMMAND( 0x100, 0x0000 ); /*power supply setup*/	
 	LCD_WRITE_COMMAND( 0x101, 0x0000 ); 
 	LCD_WRITE_COMMAND( 0x102, 0x3110 ); 
@@ -219,7 +219,7 @@ void lcd_init(void)
 	LCD_WRITE_COMMAND( 0x00b, 0x0000 );
 	LCD_WRITE_COMMAND( 0x00c, 0x0000 );
 	LCD_WRITE_COMMAND( 0x00d, 0x0018 );
-	/* LTPS control settings */   
+	/* LTPS control settings */
 	LCD_WRITE_COMMAND( 0x012, 0x0000 );
 	LCD_WRITE_COMMAND( 0x013, 0x0000 );
 	LCD_WRITE_COMMAND( 0x018, 0x0000 );

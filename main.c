@@ -8,6 +8,7 @@
 // #define STM32F10X_MD_VL // for stm32f100rb, add to project option
 
 #define PLAYERMOVE 6
+#define MAX_ENUMY 4
 
 #define LED_BLUE_H() GPIOC->BSRR = 0x1 << 8
 #define LED_BLUE_L() GPIOC->BSRR = 0x1 << 24
@@ -53,24 +54,20 @@ const unsigned short IMG_white_circular2[] = {
     0x0000,0x0000,0x0000,0x0000,0x0000,0x0841,0x39e7,0x738e,0x738e,0x39e7,0x0841,0x0000,0x0000,0x0000,0x0000,0x0000 
 };
 
-int sdata;
-int i;
-int j;
-int x;
-
 unsigned char read_res ;
 unsigned char led_on;
-unsigned short keyboard_data;
-unsigned short old_keyboard_data;
 unsigned long long int system_tick;
 unsigned char tick_flag;
 unsigned char touch_flag;
+unsigned int gametime;
+
+unsigned short keyboard_data, old_keyboard_data;
 
 typedef struct {
     short x;
     short y;
-} playerState;
-playerState player, prevplayer;
+} point;
+point player, prevplayer, prevbullet;
 
 typedef struct {
     short x;
@@ -79,25 +76,26 @@ typedef struct {
     short dy;
     short alive;
 } bulletState;
-bulletState bullet, prevbullet;
+bulletState bullet;
 
 typedef struct {
     short x;
     short y;
     char alive;
 } enumyState;
-enumyState enumy[4];
+enumyState enumy[MAX_ENUMY];
 
 unsigned short orangebox[16*16];
 unsigned short blackbox[16*16];
 unsigned short whitebox[16*16];
+unsigned short graybox[16*16];
 
 typedef struct {
 	unsigned int  x;
 	unsigned int  y;
 	unsigned long x_ad_val; //ADC value
 	unsigned long y_ad_val;						   	    
-	unsigned char  pen_status;//The pen of the state
+	unsigned char pen_status;//The pen of the state
 } _touch_dot;
 extern _touch_dot touch_dot;
 
@@ -130,67 +128,101 @@ void keyUpdate()
     keyboard_data |= (GPIOC->IDR & 0xF) << 8;
     GPIOC->BSRR = 1<<7 | 1 << (6+16);
     keyboard_data |= (GPIOC->IDR & 0xF) << 12;
-    
-//    if( ( keyboard_data & 1<<7 ) && !( old_keyboard_data & 1<<7 ) )
-//        onKeyPressed(7);
-//    else if( ( keyboard_data & 1<<6 ) && !( old_keyboard_data & 1<<6 ) )
-//        onKeyPressed(6); // up
-//    else if( ( keyboard_data & 1<<3 ) && !( old_keyboard_data & 1<<3 ) )
-//        onKeyPressed(3); // left
-//    else if( ( keyboard_data & 1<<2 ) && !( old_keyboard_data & 1<<2 ) )
-//        onKeyPressed(2);
-//    else if( ( keyboard_data & 1<<1 ) && !( old_keyboard_data & 1<<1 ) )
-//        onKeyPressed(1);
 }
 
 void gameInit()
 {
+    unsigned int i;
+    
+    lcd_clear_screen(BLACK);
+    
+    gametime = 0;
+    
+    for(i = 0; i < 20; i++)
+    {
+        lcd_display_image((const unsigned char*)graybox, 14*16, i*16, 16, 16);
+        lcd_display_image((const unsigned char*)graybox, 0, i*16, 16, 16);
+    }
+    
+    for(i = 0; i < 15; i++)
+    {
+        lcd_display_image((const unsigned char*)graybox, i*16, 0, 16, 16);
+        lcd_display_image((const unsigned char*)graybox, i*16, 19*16, 16, 16);
+    }
+    
     player.x = 120;
     player.y = 90;
     
-    for(i = 0; i < 4; i++)
+    for(i = 0; i < MAX_ENUMY; i++)
     {
         enumy[i].x = 48 + 48*i;
         enumy[i].y = 204;
         enumy[i].alive = 1;
     }
-//    enumy[0].x = 60;
-//    enumy[0].y = 90;
-//    enumy[0].alive = 1;
-//    
-//    enumy[1].x = 60;
-//    enumy[1].y = 270;
-//    enumy[1].alive = 1;
-//    
-//    enumy[2].x = 180;
-//    enumy[2].y = 90;
-//    enumy[2].alive = 1;
-//    
-//    enumy[3].x = 180;
-//    enumy[3].y = 270;
-//    enumy[3].alive = 1;
-    
+
     bullet.alive = 0;
+}
+
+void screenRefresh()
+{
+    unsigned int i;
+    lcd_display_string((const unsigned char*)"Time :    ",BLACK,WHITE,8,0);
+    lcd_display_number(15,0,gametime,3);
+    
+    for(i = 0; i< 4; i++)
+    {
+        if(enumy[i].alive) lcd_display_image((const unsigned char*)whitebox, enumy[i].x-8, enumy[i].y-8, 16, 16);
+        else lcd_display_image((const unsigned char*)blackbox, enumy[i].x-8, enumy[i].y-8, 16, 16);
+    }
+    
+    lcd_display_image((const unsigned char*)blackbox, prevbullet.x-8, prevbullet.y-8, 16, 16);
+    if( bullet.alive ) lcd_display_image((const unsigned char*)orangebox, bullet.x-8, bullet.y-8, 16, 16);
+    
+    lcd_display_image((const unsigned char*)blackbox, prevplayer.x-8, prevplayer.y-8, 16, 16);
+    lcd_display_image((const unsigned char*)IMG_white_circular2, player.x-8, player.y-8, 16, 16);
+}
+
+void bulletShot()
+{
+    if( touch_flag && !bullet.alive )
+    {
+        bullet.alive = 1;
+        bullet.x = player.x;
+        bullet.y = player.y;
+        bullet.dx = ( touch_dot.x - player.x ) / 8;
+        bullet.dy = ( touch_dot.y - player.y ) / 8;
+    }
+    touch_flag = 0;
 }
 
 void gameUpdate()
 {
+    unsigned int i;
     prevplayer.x = player.x;
     prevplayer.y = player.y;
+    if( bullet.alive )
+    {
+        prevbullet.x = bullet.x;
+        prevbullet.y = bullet.y;
+    }
     
-    if( keyboard_data & 1<<6 ) // up
+    if( !( system_tick % 10 ) ) gametime++;
+    
+    if( keyboard_data & 1<<9 ) // up
         player.x += PLAYERMOVE;
-    if( keyboard_data & 1<<3 ) // left
+    if( keyboard_data & 1<<6 ) // left
         player.y -= PLAYERMOVE;
-    if( keyboard_data & 1<<2 ) // down
+    if( keyboard_data & 1<<1 ) // down
         player.x -= PLAYERMOVE;
-    if( keyboard_data & 1<<1 ) // right
+    if( keyboard_data & 1<<4 ) // right
         player.y += PLAYERMOVE;
     
-    if(player.x > 232) player.x = 232;
-    if(player.x < 8) player.x = 8;
-    if(player.y > 312) player.y = 312;
-    if(player.y < 8) player.y = 8;
+    if(player.x > 216) player.x = 216;
+    if(player.x < 24) player.x = 24;
+    if(player.y > 296) player.y = 296;
+    if(player.y < 24) player.y = 24;
+    
+    bulletShot();
     
     for( i =  0; i < 4; i++ )
     {
@@ -207,79 +239,17 @@ void gameUpdate()
     {
         bullet.x += bullet.dx;
         bullet.y += bullet.dy;
-        if( bullet.x > 224 | bullet.x < 0 ) bullet.alive = 0;
-        if( bullet.y > 304 | bullet.y < 0) bullet.alive = 0;
+        if( bullet.x > 216 | bullet.x < 24 ) bullet.alive = 0;
+        if( bullet.y > 296 | bullet.y < 24 ) bullet.alive = 0;
     }
 }
 
-void onKeyPressed(const unsigned int key)
+void gameLogic()
 {
-    // if( key == 7 ) // lcd_clear_screen(BLACK);
-    if( key == 6 ) // up
-        player.x += 16;
-    if( key == 3 ) // left
-        player.y -= 16;
-    if( key == 2 ) // down
-        player.x -= 16;
-    if( key == 1 ) // right
-        player.y += 16;
-    
-    if(player.x > 224) player.x = 224;
-    if(player.x < 0) player.x = 0;
-    if(player.y > 304) player.y = 304;
-    if(player.y < 0) player.y = 0;
-}
-
-void screenRefresh()
-{
-    for(i = 0; i< 4; i++)
-    {
-        if(enumy[i].alive) lcd_display_image((const unsigned char*)whitebox, enumy[i].x-8, enumy[i].y-8, 16, 16);
-        else lcd_display_image((const unsigned char*)blackbox, enumy[i].x-8, enumy[i].y-8, 16, 16);
-    }
-    
-    lcd_display_image((const unsigned char*)blackbox, bullet.x-bullet.dx-8, bullet.y-bullet.dy-8, 16, 16);
-    if( bullet.alive )
-    {
-        lcd_display_image((const unsigned char*)orangebox, bullet.x-8, bullet.y-8, 16, 16);
-    }
-    else lcd_display_image((const unsigned char*)blackbox, bullet.x-8, bullet.y-8, 16, 16);
-    
-     lcd_display_image((const unsigned char*)blackbox, prevplayer.x-8, prevplayer.y-8, 16, 16);
-     lcd_display_image((const unsigned char*)IMG_white_circular2, player.x-8, player.y-8, 16, 16);
-}
-
-void bulletShot()
-{
-    lcd_display_image((const unsigned char*)blackbox, bullet.x, bullet.y, 16, 16);
-    bullet.alive = 1;
-    bullet.x = player.x;
-    bullet.y = player.y;
-    bullet.dx = ( touch_dot.x - player.x ) / 16;
-    bullet.dy = ( touch_dot.y - player.y ) / 16;
-}
-
-//////////////////////// Start main() ///////////////////////
-
-int main()
-{
-    board_init();
-	
-	LED_BLUE_H();
-	lcd_init();
-	LED_BLUE_L();
-    
-	system_tick = 0;
-    tick_flag = 0;
-    touch_flag = 0;
-	SysTick->CTRL |= SysTick_CTRL_ENABLE;
-    
-    for(i = 0; i < 256; i++) orangebox[i] = ORANGE;
-    for(i = 0; i < 256; i++) blackbox[i] = BLACK;
-    for(i = 0; i < 256; i++) whitebox[i] = WHITE;
     gameInit();
 	
-	while(1)
+	while( ( enumy[0].alive ) | ( enumy[1].alive )
+         | ( enumy[2].alive ) | ( enumy[3].alive ) )
 	{
         if(tick_flag)
         {
@@ -290,17 +260,15 @@ int main()
                 
                 led_on = !led_on;
             }
+            
             if(touch_flag)
             {
                 read_res=Read_Continue();
                 TOUCH_nCS_H();
                 LCD_RS_L();
                 LCD_CS_L();
-//                display_touch_debug();
-//                lcd_display_image((const unsigned char*)orangebox, touch_dot.x-8 , touch_dot.y-8, 16, 16);
-                bulletShot();
-                touch_flag = 0;
             }
+            
             if( !( system_tick % 2 ) )
             {
                 keyUpdate();
@@ -309,14 +277,117 @@ int main()
                 
                 screenRefresh();
             }
-//            lcd_display_number(2,2,(keyboard_data >> 0) & 0xF,2);
-//            lcd_display_number(6,2,(keyboard_data >> 4) & 0xF,2);
-//            lcd_display_number(10,2,(keyboard_data >> 8) & 0xF,2);
-//            lcd_display_number(14,2,(keyboard_data >> 12) & 0xF,2);
+            
+            touch_flag = 0;
             tick_flag = 0;
         }
 	}
 }
+void draw_menu()
+{
+    unsigned int i;
+    
+    lcd_clear_screen(BLACK);
+    for(i = 0; i < 20; i++)
+    {
+        lcd_display_image((const unsigned char*)IMG_white_circular2, 14*16, i*16, 16, 16);
+        lcd_display_image((const unsigned char*)IMG_white_circular2, 0, i*16, 16, 16);
+    }
+    
+    for(i = 0; i < 15; i++)
+    {
+        lcd_display_image((const unsigned char*)IMG_white_circular2, i*16, 0, 16, 16);
+        lcd_display_image((const unsigned char*)IMG_white_circular2, i*16, 19*16, 16, 16);
+    }
+    // lcd_clear_screen(BLACK);
+    
+    lcd_display_string((const unsigned char*)"+--------------+", WHITE, BLACK, 6, 6);
+    lcd_display_string((const unsigned char*)"|SHOOTING  STAR|", WHITE, BLACK, 6, 7);
+    lcd_display_string((const unsigned char*)"+--------------+", WHITE, BLACK, 6, 8);
+    
+    while(!touch_flag)
+    {
+        lcd_display_string((const unsigned char*)"PRESS ANY", WHITE, BLACK, 10, 13);
+        lcd_display_string((const unsigned char*)"WHERE TO START", WHITE, BLACK, 8, 15);
+        delay_ms(6000);
+        
+        lcd_display_string((const unsigned char*)"         ", WHITE, BLACK, 10 , 13);
+        lcd_display_string((const unsigned char*)"              ", WHITE, BLACK, 8, 15);
+        delay_ms(6000);
+    }
+    touch_flag = 0;
+}
+
+void draw_clear()
+{
+    unsigned int i;
+    lcd_clear_screen(BLACK);
+    
+    for (i = 0; i < 20; i++)
+    {
+        lcd_display_image((const unsigned char*)IMG_white_circular2, 14*16, i*16, 16, 16);
+        lcd_display_image((const unsigned char*)IMG_white_circular2, 0, i*16, 16, 16);
+    }
+    
+    for (i = 0; i < 15; i++)
+    {
+        lcd_display_image((const unsigned char*)IMG_white_circular2, i*16, 0, 16, 16);
+        lcd_display_image((const unsigned char*)IMG_white_circular2, i*16, 19*16, 16, 16);
+    }
+    
+    lcd_display_string((const unsigned char*)"        'O'b        ", WHITE, BLACK, 6, 11);
+    
+    lcd_display_string((const unsigned char*)"Time :    ",BLACK,WHITE,8,11);
+    lcd_display_number(15,11,gametime,3);
+    
+    for (i=0;i < 3;i++)
+    {
+        lcd_display_string((const unsigned char*)"+------------------+", WHITE, BLACK, 6, 7);
+        lcd_display_string((const unsigned char*)"| CONGRATULATIONS! |", WHITE, BLACK, 6, 8); //20
+        lcd_display_string((const unsigned char*)"+--------   -------+", WHITE, BLACK, 6, 9);
+        lcd_display_string((const unsigned char*)"         V           ", WHITE, BLACK, 6, 10);
+        delay_ms(6000);
+        
+        lcd_display_string((const unsigned char*)"                    ", WHITE, BLACK, 6, 7);
+        lcd_display_string((const unsigned char*)"                    ", WHITE, BLACK, 6, 8); //20
+        lcd_display_string((const unsigned char*)"                    ", WHITE, BLACK, 6, 9);
+        lcd_display_string((const unsigned char*)"                    ", WHITE, BLACK, 6, 10);
+        delay_ms(6000);
+    }
+    
+    delay_ms(6000);
+}
+
+//////////////////////// Start main() ///////////////////////
+
+int main()
+{
+    unsigned int i;
+    board_init();
+	
+	LED_BLUE_H();
+	lcd_init(); // screen all black;
+	LED_BLUE_L();
+    
+	system_tick = 0;
+    tick_flag = 0;
+    touch_flag = 0;
+	SysTick->CTRL |= SysTick_CTRL_ENABLE;
+    
+    for(i = 0; i < 256; i++) orangebox[i] = ORANGE;
+    for(i = 0; i < 256; i++) blackbox[i] = BLACK;
+    for(i = 0; i < 256; i++) whitebox[i] = WHITE;
+    for(i = 0; i < 256; i++) graybox[i] = GRAY;
+    
+    while(1)
+    {
+        draw_menu();
+        gameLogic();
+        draw_clear();
+    }
+}
+
+// lcd_display_number(2,2,(keyboard_data >> 0) & 0xF,2);
 
 void EXTI9_5_IRQHandler(void) //PB9 Touch interrupt
 {
