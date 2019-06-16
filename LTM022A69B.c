@@ -267,7 +267,8 @@ void lcd_init(void)
 
 	delay_us(20);
 	
-	lcd_clear_screen(RED);
+	// lcd_clear_screen(RED);
+	lcd_clear_screen(BLACK);
 }
 
 
